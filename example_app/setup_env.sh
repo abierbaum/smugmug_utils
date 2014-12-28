@@ -1,1 +1,1 @@
-virtualenv --prompt=example_app_env --python=python3 env
+virtualenv --prompt="(example_app_env)" --python=python3 env
