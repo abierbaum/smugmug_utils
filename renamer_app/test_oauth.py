@@ -14,7 +14,7 @@ REQUEST_TOKEN_URL = OAUTH_ORIGIN + '/services/oauth/1.0a/getRequestToken'
 ACCESS_TOKEN_URL  = OAUTH_ORIGIN + '/services/oauth/1.0a/getAccessToken'
 AUTHORIZE_URL     = OAUTH_ORIGIN + '/services/oauth/1.0a/authorize'
 
-API_ORIGIN = 'http://api.smugmug.com'
+API_ORIGIN = 'https://api.smugmug.com'
 BASE_URL = API_ORIGIN + '/api/v2'
 
 TOKEN_FILE = 'access_token.json'
