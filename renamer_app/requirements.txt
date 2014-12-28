@@ -1,5 +1,7 @@
 argparse==1.2.1
 oauthlib==0.7.2
+python-dateutil==2.3
 requests==2.5.1
 requests-oauthlib==0.4.2
+six==1.8.0
 wsgiref==0.1.2

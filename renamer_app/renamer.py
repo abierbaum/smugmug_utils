@@ -33,6 +33,9 @@ def main():
    print "   ResponseLevel: ", user_obj['ResponseLevel']
 
    # Check if we have a password locking us out
+   # NOTE: It appears that if the user account has a password we have
+   #       to log in with a post to proceed to get more details.
+   #       Not sure where this state is being stored (cookie?)
    if user_uris.has_key('UnlockUser'):
       print "Unlocking user... ",
       if args.password is None:
