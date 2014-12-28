@@ -85,7 +85,7 @@ def main():
    while not finished:
       r = s.get(smUrl(next_url), params = expand_params)
       r_obj = r.json()
-      #printObj(r_obj)
+      printObj(r_obj)
 
       next_url = r_obj['Response']['Pages']['NextPage']
       last_url = r_obj['Response']['Pages']['LastPage']
@@ -123,7 +123,8 @@ def main():
             print "  renaming: '%s' [%s] --> [%s] (%s)" % (title, filename,
                                                            new_fname, weburi)
             if not args.dry_run:
-               r = s.patch(smUrl(uri), data = json.dumps({'FileName': new_fname}))
+               #r = s.patch(smUrl(uri), data = json.dumps({'FileName': new_fname}))
+               r =  s.patch(smUrl(uri), data = json.dumps({'Caption': new_fname}))
                printObj(r.json())
                if 200 != r.status_code:
                   print "Failure to patch:"
