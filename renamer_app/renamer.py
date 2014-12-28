@@ -2,6 +2,7 @@ import argparse
 import dateutil.parser
 import json
 import os
+import re
 import requests
 
 from urlparse import parse_qs
@@ -24,11 +25,14 @@ def main():
    # 1) Get the user logged in and ready to go
    r = s.get(smUrl("/api/v2!authuser"))
    r_obj = r.json()
-   print "Authuser"
-   printObj(r_obj)
-
-   user_obj = r_obj['Response']['User']
+   #printObj(r_obj)
+   user_obj  = r_obj['Response']['User']
    user_uris = user_obj['Uris']
+   print "First Attempt:"
+   print "Authuser: ", user_obj['NickName']
+   print "   ResponseLevel: ", user_obj['ResponseLevel']
+
+   # Check if we have a password locking us out
    if user_uris.has_key('UnlockUser'):
       print "Unlocking user... ",
       if args.password is None:
@@ -41,73 +45,94 @@ def main():
       else:
          raise AppError("Unlocking user failed")
 
+   # Try getting user details again (now that should be logged in)
    r = s.get(smUrl("/api/v2!authuser"))
    r_obj = r.json()
-   print "Authuser"
-   printObj(r_obj)
+   user_obj  = r_obj['Response']['User']
+   user_uris = user_obj['Uris']
+   print "Authuser: ", user_obj['Name']
+   print "   ResponseLevel: ", user_obj['ResponseLevel']
 
-   if 0:
-      r = s.get(smUrl("/api/v2/user/abierbaum"))
+   # Loop through all recent images
+   # - Look for images that need filename setup with date
+   # - If we have a date value to use, then set it
+   page_count_size = 3
+   cull_results    = True
+
+   assert user_uris.has_key('UserRecentImages'), "Can't find recent image URI"
+
+   recent_images_uri = user_uris['UserRecentImages']['Uri']
+   expand_params = {'_expand'      : 'ImageMetadata',
+                    '_expandmethod': 'inline'}
+
+
+   next_url = recent_images_uri + "?count=%s" % page_count_size
+
+   if cull_results:
+      # Limit returned data
+      # note: have to put filterui in here because it ends up in the "NextUrl"
+      # and if we don't do this way we end up adding it twice.
+      next_url += "&_filteruri=ImageMetadata" \
+               + "&_filter=Uri,Title,WebUri,DateTimeCreated,FileName,IsVideo"
+   finished = False
+
+   def is_already_date_named(fnameStr):
+      return re.match('^\d{4,4}\-\D{3,3}',fnameStr) != None
+
+   while not finished:
+      r = s.get(smUrl(next_url), params = expand_params)
       r_obj = r.json()
-      print "Abierbaum user"
-      printObj(r_obj)
+      #printObj(r_obj)
 
+      next_url = r_obj['Response']['Pages']['NextPage']
+      last_url = r_obj['Response']['Pages']['LastPage']
+      cur_url  = r_obj['Response']['Uri']
 
-      r = s.get(smUrl("/api/v2/user/abierbaum!recentimages"))
-      r_obj = r.json()
-      print "abierbaum recent images"
-      printObj(r_obj)
+      total_items = r_obj['Response']['Pages']['Total']
+      cur_start   = r_obj['Response']['Pages']['Start']
 
-
-   if 1:
-      ##user_obj = r_obj['Response']['User']
-      ##user_uris = user_obj['Uris']
-
-
-      # Loop through all recent images
-      # - Look for images that need filename setup with date
-      # - If we have a date value to use, then set it
-      page_count_size = 3
-
-      recent_images_uri = user_uris['UserRecentImages']['Uri']
-
-
-      r = s.get(smUrl(recent_images_uri), params = {'count': page_count_size,
-                                                    '_expand': 'ImageMetadata',
-                                                    '_expandmethod': 'inline'})
-      r_obj = r.json()
-      printObj(r_obj)
+      if cur_url == last_url:
+         finished = True
 
       image_objs = r_obj['Response']['Image']
       for image_obj in image_objs:
-         metadata = image_obj['Uris']['ImageMetadata']['ImageMetadata']
-         title = image_obj['Title']
-         uri = image_obj['Uri']
-         is_video = image_obj['IsVideo']
+         metadata     = image_obj['Uris']['ImageMetadata']['ImageMetadata']
+         title        = image_obj['Title']
+         uri          = image_obj['Uri']
+         weburi       = image_obj['WebUri']
+         #is_video     = image_obj['IsVideo']
+         if not metadata.has_key('DateTimeCreated'):
+            print "WARNING: No DateTimeCreated for [%s]" % weburi
+            continue
+
          date_created = metadata['DateTimeCreated']
-         image_date = image_obj['Date']
-         last_update = image_obj['LastUpdated']
-         filename = image_obj['FileName']
+         filename     = image_obj['FileName']
+         #image_date   = image_obj['Date']
+         #last_update  = image_obj['LastUpdated']
+         #parsed_image_date = dateutil.parser.parse(image_date)
+         #parsed_updated   = dateutil.parser.parse(last_update)
 
          parsed_created = dateutil.parser.parse(date_created.replace(':', ' ', 2))
-         parsed_image_date = dateutil.parser.parse(image_date)
-         parsed_updated = dateutil.parser.parse(last_update)
+         file_prefix    = parsed_created.strftime('%Y-%b-%d-%H:%M')
 
-         formatted_created = parsed_created.strftime('%Y-%b-%d-%H:%M')
+         if not is_already_date_named(filename):
+            new_fname = "%s_%s" % (file_prefix, filename)
+            print "  renaming: '%s' [%s] --> [%s] (%s)" % (title, filename,
+                                                           new_fname, weburi)
+            if not args.dry_run:
+               r = s.patch(smUrl(uri), data = json.dumps({'FileName': new_fname}))
+               printObj(r.json())
+               if 200 != r.status_code:
+                  print "Failure to patch:"
+                  printObj(r.json())
+                  raise AppError("Failed patch")
+         else:
+            print "  skipping: '%s' [%s]" % (title, filename)
 
-         print """image: %s [%s]
-   uri: %s
-   is_video: %s
-   created: %s
-            %s
-            %s
-      date: %s
-            %s
-   updated: %s
-            %s
-""" % (title, filename, uri, is_video, date_created, parsed_created, formatted_created,
-       image_date, parsed_image_date, last_update, parsed_updated)
-
+      # Output the current progress
+      pct_done = float(cur_start)/total_items
+      prefix = "[%.1f] %s/%s" % (pct_done * 100.0, cur_start, total_items)
+      print prefix
 
 
 
