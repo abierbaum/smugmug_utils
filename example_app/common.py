@@ -1,9 +1,7 @@
 from rauth import OAuth1Service
 from urllib.parse import urlsplit, urlunsplit, parse_qsl, urlencode
 
-# Get an API Key in your SmugMug Account Settings.
-API_KEY = None
-API_KEY_SECRET = None
+from private_credentials import API_KEY, API_KEY_SECRET
 
 OAUTH_ORIGIN = 'https://secure.smugmug.com'
 REQUEST_TOKEN_URL = OAUTH_ORIGIN + '/services/oauth/1.0a/getRequestToken'
