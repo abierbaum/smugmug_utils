@@ -44,9 +44,9 @@ def main():
         image_uri = first_image['Uri']
 
         # change the image caption
-        r = session.post(API_ORIGIN + image_uri,
+        r = session.patch(API_ORIGIN + image_uri,
                         data = json.dumps({'Caption': new_caption}), headers = headers)
-        print("Post result")
+        print("Patch result")
         print(r.content)
 
 if __name__ == '__main__':
